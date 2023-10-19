@@ -51,15 +51,33 @@ sed -i "s/^PASSWORD =.*/PASSWORD = \"$CLIENT_PASSWORD\"/" /usr/local/status-clie
 
 # 如果启用了vnStat，配置vnStat
 if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
-    # 验证vnStat是否已正确安装和配置
     if ! command -v vnstat &> /dev/null; then
         echo "vnStat could not be found!"
         exit
     fi
-    
-    # 检查并启动vnStat服务
-    systemctl enable vnstat
-    systemctl start vnstat
+
+    VNSTAT_VERSION=$(vnstat --version | head -n 1 | awk '{print $2}')
+    echo "Detected vnStat version: $VNSTAT_VERSION"
+
+    case "$VNSTAT_VERSION" in 
+        1.*)
+            # 检查并启动vnStat服务 (for version 1.x)
+            service vnstat start
+            ;;
+        2.*)
+            # 检查并启动vnStat服务 (for version 2.x)
+            systemctl enable vnstat
+            systemctl start vnstat
+            ;;
+        *)
+            echo "Unsupported vnStat version"
+            exit 1
+            ;;
+    esac
+
+    # 设置cron job在每月1号重置流量
+    # Note: For vnStat 1.x, you may need to handle the database reset manually or upgrade to 2.x
+    (crontab -l 2>/dev/null; echo "0 0 1 * * vnstat --delete --force") | crontab -
 fi
 
 # 创建Systemd服务单元文件
