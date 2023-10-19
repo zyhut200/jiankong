@@ -53,8 +53,26 @@ sed -i "s/^PASSWORD =.*/PASSWORD = \"$CLIENT_PASSWORD\"/" /usr/local/status-clie
 if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
     # 下载，编译和安装vnStat
     wget -O vnstat.tar.gz https://humdi.net/vnstat/vnstat-latest.tar.gz
+    
+    if [ ! -f "vnstat.tar.gz" ]; then
+        echo "Failed to download vnstat.tar.gz"
+        exit 1
+    fi
+    
     tar -zxvf vnstat.tar.gz
-    cd vnstat-* || exit 1
+    
+    VNSTAT_DIR=$(ls | grep vnstat-)
+    
+    if [ ! -d "$VNSTAT_DIR" ]; then
+        echo "Failed to extract vnStat directory"
+        exit 1
+    fi
+    
+    cd $VNSTAT_DIR || exit 1
+    
+    echo "Current directory: $(pwd)"
+    echo "Directory contents:"
+    ls -al
     
     if [ -f "Makefile" ]; then
         make && sudo make install
@@ -64,13 +82,7 @@ if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
     fi
 
     cd .. || exit 1
-
-    # 检查vnstat命令是否可用
-    if ! command -v vnstat &> /dev/null; then
-        echo "vnStat could not be installed correctly"
-        exit 1
-    fi
-
+    
     # 初始化 vnStat 和启动服务
     vnstat --create -i eth0
     systemctl enable vnstat
