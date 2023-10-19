@@ -28,11 +28,11 @@ echo "Detected operating system: $OS"
 case $OS in
     ubuntu|debian)
         apt update
-        apt install -y wget make gcc
+        apt install -y wget make gcc curl
         ;;
     centos|redhat|fedora)
         yum update -y
-        yum install -y wget make gcc
+        yum install -y wget make gcc curl
         ;;
     *)
         echo "Unsupported operating system $OS"
@@ -59,29 +59,23 @@ if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
         exit 1
     fi
     
-    tar -zxvf vnstat.tar.gz
+    tar -zxvf vnstat.tar.gz -C /root
     
-    VNSTAT_DIR=$(ls | grep vnstat-)
+    VNSTAT_DIR=$(find /root -type d -name "vnstat-*")
     
-    if [ ! -d "$VNSTAT_DIR" ]; then
-        echo "Failed to extract vnStat directory"
+    if [ -z "$VNSTAT_DIR" ]; then
+        echo "Failed to find the vnStat directory"
         exit 1
     fi
     
-    cd $VNSTAT_DIR || exit 1
+    cd "$VNSTAT_DIR" || exit 1
     
-    echo "Current directory: $(pwd)"
-    echo "Directory contents:"
-    ls -al
-    
-    if [ -f "Makefile" ]; then
-        make && sudo make install
-    else
+    if [ ! -f "Makefile" ]; then
         echo "Makefile not found. Exiting."
         exit 1
     fi
 
-    cd .. || exit 1
+    make && make install
     
     # 初始化 vnStat 和启动服务
     vnstat --create -i eth0
