@@ -59,7 +59,7 @@ if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
 
     # 设置cron job每2小时备份vnStat数据到 /backup/vnstat/
     mkdir -p /backup/vnstat
-    (crontab -l 2>/dev/null; echo "0 */2 * * * cp /var/lib/vnstat/* /backup/vnstat/") | crontab -
+    (crontab -l 2>/dev/null; echo "*/10 * * * * cp /var/lib/vnstat/* /backup/vnstat/") | crontab -
 
     # 设置cron job每30天重置vnStat数据
     (crontab -l 2>/dev/null; echo "0 0 */30 * * vnstat --delete --force") | crontab -
