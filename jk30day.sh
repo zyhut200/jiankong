@@ -28,11 +28,11 @@ echo "Detected operating system: $OS"
 case $OS in
     ubuntu|debian)
         apt update
-        apt install -y wget make gcc curl
+        apt install -y wget make gcc autoconf
         ;;
     centos|redhat|fedora)
         yum update -y
-        yum install -y wget make gcc curl
+        yum install -y wget make gcc autoconf
         ;;
     *)
         echo "Unsupported operating system $OS"
@@ -51,32 +51,20 @@ sed -i "s/^PASSWORD =.*/PASSWORD = \"$CLIENT_PASSWORD\"/" /usr/local/status-clie
 
 # 安装并配置vnStat
 if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
-    # 下载，编译和安装vnStat
+    # 下载，解压，编译和安装vnStat
     wget -O vnstat.tar.gz https://humdi.net/vnstat/vnstat-latest.tar.gz
+    tar -zxvf vnstat.tar.gz
+    cd vnstat-* || exit
     
-    if [ ! -f "vnstat.tar.gz" ]; then
-        echo "Failed to download vnstat.tar.gz"
-        exit 1
-    fi
-    
-    tar -zxvf vnstat.tar.gz -C /root
-    
-    VNSTAT_DIR=$(find /root -type d -name "vnstat-*")
-    
-    if [ -z "$VNSTAT_DIR" ]; then
-        echo "Failed to find the vnStat directory"
-        exit 1
-    fi
-    
-    cd "$VNSTAT_DIR" || exit 1
-    
-    if [ ! -f "Makefile" ]; then
-        echo "Makefile not found. Exiting."
+    # 运行configure脚本来生成Makefile
+    if [ -f configure ]; then
+        ./configure
+        make && make install
+    else
+        echo "Configure script not found. Exiting."
         exit 1
     fi
 
-    make && make install
-    
     # 初始化 vnStat 和启动服务
     vnstat --create -i eth0
     systemctl enable vnstat
@@ -85,6 +73,9 @@ if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
     # 设置cron job每30天重置vnStat数据
     (crontab -l 2>/dev/null; echo "0 0 */30 * * vnstat --delete --force") | crontab -
 fi
+
+# 返回到脚本的原始目录
+cd - || exit
 
 # 创建Systemd服务单元文件
 PYTHON_COMMAND=$(command -v python3 || command -v python)
