@@ -54,8 +54,22 @@ if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
     # 下载，编译和安装vnStat
     wget -O vnstat.tar.gz https://humdi.net/vnstat/vnstat-latest.tar.gz
     tar -zxvf vnstat.tar.gz
-    cd vnstat-*
-    make && sudo make install
+    cd vnstat-* || exit 1
+    
+    if [ -f "Makefile" ]; then
+        make && sudo make install
+    else
+        echo "Makefile not found. Exiting."
+        exit 1
+    fi
+
+    cd .. || exit 1
+
+    # 检查vnstat命令是否可用
+    if ! command -v vnstat &> /dev/null; then
+        echo "vnStat could not be installed correctly"
+        exit 1
+    fi
 
     # 初始化 vnStat 和启动服务
     vnstat --create -i eth0
