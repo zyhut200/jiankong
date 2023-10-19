@@ -1,41 +1,35 @@
 #!/bin/bash
 
-# 获取本机IP地址
+# 获取客户端服务器的公网IP
 CLIENT_IP=$(curl -s https://api.ipify.org)
+echo "Client IP: $CLIENT_IP"
 
-# 定义服务器和客户端设置
-SERVER="45.148.134.106"
-SERVER_PORT=51000
-CLIENT_USER="$CLIENT_IP"
-CLIENT_PASSWORD="123456"
-CLIENT_VNSTAT="yes" # 是否启用vnStat
+# 客户端配置信息
+CLIENT_USER="$CLIENT_IP"           # 用户名
+CLIENT_PASSWORD="123456"           # 密码
+CLIENT_SERVER="45.148.134.106"     # 服务端IP地址
+CLIENT_SERVER_PORT="51000"         # 服务端监听的端口
+CLIENT_VNSTAT="yes"                # 是否启用vnStat
 
-# 检测操作系统并安装必要的软件包
+# 检查操作系统并安装必要软件
 if [ -f /etc/os-release ]; then
     . /etc/os-release
-    OS=$NAME
 elif type lsb_release >/dev/null 2>&1; then
     OS=$(lsb_release -si)
-elif [ -f /etc/lsb-release ]; then
-    . /etc/lsb-release
-    OS=$DISTRIB_ID
-elif [ -f /etc/debian_version ]; then
-    OS=Debian
 elif [ -f /etc/redhat-release ]; then
-    OS=$(cat /etc/redhat-release | cut -f1 -d" ")
+    OS="Red Hat"
 else
     OS=$(uname -s)
 fi
 
-# 安装依赖和客户端
 case $OS in
     Ubuntu*|Debian*)
         apt-get update
-        apt-get install -y python3 python3-pip vnstat wget
+        apt-get install -y python python-pip wget vnstat
         ;;
     CentOS*|Fedora*|Red*)
         yum update -y
-        yum install -y python3 python3-pip vnstat wget
+        yum install -y python python-pip wget vnstat
         ;;
     *)
         echo "Unsupported operating system $OS"
@@ -43,25 +37,32 @@ case $OS in
         ;;
 esac
 
-# 下载并修改客户端配置文件
+# 下载客户端脚本并配置
 wget -O /usr/local/status-client.py https://raw.githubusercontent.com/cokemine/ServerStatus-Hotaru/master/clients/status-client.py
-wget -O /usr/local/status-client.conf https://raw.githubusercontent.com/cokemine/ServerStatus-Hotaru/master/clients/status-client.conf
-
-# 修改客户端配置文件
-sed -i "s/SERVER = .*/SERVER = \"$SERVER\"/g" /usr/local/status-client.py
-sed -i "s/PORT = .*/PORT = $SERVER_PORT/g" /usr/local/status-client.py
+sed -i "s/SERVER = .*/SERVER = \"$CLIENT_SERVER\"/g" /usr/local/status-client.py
+sed -i "s/PORT = .*/PORT = $CLIENT_SERVER_PORT/g" /usr/local/status-client.py
 sed -i "s/USER = .*/USER = \"$CLIENT_USER\"/g" /usr/local/status-client.py
 sed -i "s/PASSWORD = .*/PASSWORD = \"$CLIENT_PASSWORD\"/g" /usr/local/status-client.py
 
-# 如果启用了vnStat，配置vnStat
+# 如果启用vnStat，检查版本并相应配置
 if [ "$CLIENT_VNSTAT" = "yes" ]; then
-    vnstat --create -i eth0
+    VNSTAT_VERSION=$(vnstat --version | head -1 | awk '{print $2}')
+    if [[ $(echo -e "2.0\n$VNSTAT_VERSION" | sort -V | head -n1) = "2.0" ]]; then
+        if ! grep -q "Database created" <<< $(vnstat --create -i eth0); then
+            echo "Error creating vnStat database"
+            exit 1
+        fi
+        systemctl restart vnstat
+    fi
+
     systemctl enable vnstat
     systemctl start vnstat
 fi
 
-# 添加到开机启动
-echo "@reboot root /usr/bin/python3 /usr/local/status-client.py /usr/local/status-client.conf run" >> /etc/crontab
+# 设置客户端脚本为开机启动
+echo "@reboot root /usr/bin/python /usr/local/status-client.py run" >> /etc/crontab
 
-# 运行客户端
-python3 /usr/local/status-client.py /usr/local/status-client.conf run
+# 运行客户端脚本
+nohup python /usr/local/status-client.py run &
+
+echo "Client setup complete!"
