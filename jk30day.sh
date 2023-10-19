@@ -28,11 +28,12 @@ echo "Detected operating system: $OS"
 case $OS in
     ubuntu|debian)
         apt update
-        apt install -y wget make gcc autoconf
+        apt install -y wget make gcc libsqlite3-dev vnstat
         ;;
     centos|redhat|fedora)
         yum update -y
-        yum install -y wget make gcc autoconf
+        yum install -y epel-release
+        yum install -y wget make gcc sqlite-devel vnstat
         ;;
     *)
         echo "Unsupported operating system $OS"
@@ -49,35 +50,17 @@ sed -i "s/^PORT =.*/PORT = $CLIENT_SERVER_PORT/" /usr/local/status-client.py
 sed -i "s/^USER =.*/USER = \"$CLIENT_USER\"/" /usr/local/status-client.py
 sed -i "s/^PASSWORD =.*/PASSWORD = \"$CLIENT_PASSWORD\"/" /usr/local/status-client.py
 
-# 安装并配置vnStat
+# 初始化 vnStat
 if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
-    # 下载，解压，编译和安装vnStat
-    wget -O vnstat.tar.gz https://humdi.net/vnstat/vnstat-latest.tar.gz
-    tar -zxvf vnstat.tar.gz
-    cd vnstat-* || exit
-    
-    # 运行configure脚本来生成Makefile
-    if [ -f configure ]; then
-        ./configure
-        make && make install
-    else
-        echo "Configure script not found. Exiting."
-        exit 1
-    fi
-
-    # 初始化 vnStat 和启动服务
-    vnstat --create -i eth0
+    vnstat -i eth0
     systemctl enable vnstat
     systemctl start vnstat
-    
+
     # 设置cron job每30天重置vnStat数据
     (crontab -l 2>/dev/null; echo "0 0 */30 * * vnstat --delete --force") | crontab -
 fi
 
-# 返回到脚本的原始目录
-cd - || exit
-
-# 创建Systemd服务单元文件
+# 创建 Systemd 服务单元文件
 PYTHON_COMMAND=$(command -v python3 || command -v python)
 cat <<EOL > /etc/systemd/system/status-client.service
 [Unit]
@@ -95,7 +78,7 @@ ExecStart=$PYTHON_COMMAND /usr/local/status-client.py run
 WantedBy=multi-user.target
 EOL
 
-# 重新加载Systemd守护进程，启动服务并使其在开机时自启
+# 重新加载 Systemd 守护进程，启动服务并使其在开机时自启
 systemctl daemon-reload
 systemctl start status-client
 systemctl enable status-client
