@@ -1,75 +1,54 @@
 #!/bin/bash
 
-# 获取服务器的公网IP地址
+# 自动获取本机公网IP
 CLIENT_IP=$(curl -s https://api.ipify.org)
 
-# 如果获取IP地址失败，就尝试用另一个API再获取一次
-if [ -z "$CLIENT_IP" ]; then
-    CLIENT_IP=$(curl -s https://ipinfo.io/ip)
-fi
-
-# 如果再次失败，就输出错误信息并退出脚本
-if [ -z "$CLIENT_IP" ]; then
-    echo "Error: Unable to get the public IP address of this server."
-    exit 1
-fi
-
-# 将获取的IP地址赋值给 CLIENT_USER 变量
-CLIENT_USER="$CLIENT_IP"
-
-# 其他用户配置信息
-CLIENT_SERVER="45.148.134.106"
-CLIENT_PORT="51000"
-CLIENT_PASSWORD="123456"
+# 客户端设置
+CLIENT_USER="$CLIENT_IP"                   # 用户名
+CLIENT_PASSWORD="123456"                   # 密码
+CLIENT_SERVER="45.148.134.106"             # 服务端IP地址
+CLIENT_SERVER_PORT="51000"                 # 服务端监听的IP端口
+CLIENT_VNSTAT="yes"                        # 是否启用vnStat
 
 # 安装依赖
 apt-get update
-apt-get install -y python3 wget vnstat
+apt-get install -y python python-pip
+pip install psutil
 
 # 下载客户端脚本
-wget -N --no-check-certificate https://raw.githubusercontent.com/cokemine/ServerStatus-Hotaru/master/clients/status-client.py -O /usr/local/status-client.py
+cd /usr/local
+wget https://raw.githubusercontent.com/cokemine/ServerStatus-Hotaru/master/clients/status-client.py
+chmod 755 status-client.py
 
-# 如果文件下载失败，则输出错误信息并退出脚本
-if [ ! -e '/usr/local/status-client.py' ]; then
-    echo "Error: Failed to download client script."
-    exit 1
+# 创建客户端配置文件
+cat > /usr/local/status-client.conf << EOF
+# Config
+SERVER = "$CLIENT_SERVER"
+PORT = $CLIENT_SERVER_PORT
+USER = "$CLIENT_USER"
+PASSWORD = "$CLIENT_PASSWORD"
+INTERVAL = 1
+EOF
+
+# 如果启用vnStat, 需要进行安装
+if [ "$CLIENT_VNSTAT" = "yes" ]; then
+    apt-get install -y vnstat
 fi
-
-# 替换客户端脚本中的配置信息
-sed -i "s/SERVER = .*/SERVER = \"$CLIENT_SERVER\"/" /usr/local/status-client.py
-sed -i "s/PORT = .*/PORT = $CLIENT_PORT/" /usr/local/status-client.py
-sed -i "s/USER = .*/USER = \"$CLIENT_USER\"/" /usr/local/status-client.py
-sed -i "s/PASSWORD = .*/PASSWORD = \"$CLIENT_PASSWORD\"/" /usr/local/status-client.py
 
 # 创建系统服务
 cat > /etc/systemd/system/status-client.service << EOF
 [Unit]
-Description=ServerStatus client
-After=network.target
+Description=Server Status client
 
 [Service]
-Type=simple
-Restart=on-failure
-RestartSec=5s
-ExecStart=/usr/bin/python3 /usr/local/status-client.py
+WorkingDirectory=/usr/local
+ExecStart=/usr/bin/python /usr/local/status-client.py /usr/local/status-client.conf run
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# 重载系统服务、启动客户端服务、设置开机启动
-systemctl daemon-reload
-systemctl start status-client
+# 启动系统服务
 systemctl enable status-client
-
-# 输出客户端信息
-echo "————————————————————"
-echo "  ServerStatus 客户端配置信息："
-echo "  IP       : ${CLIENT_IP}"
-echo "  端口     : ${CLIENT_PORT}"
-echo "  用户名   : ${CLIENT_USER}"
-echo "  密码     : ${CLIENT_PASSWORD}"
-echo "————————————————————"
-
-# 完成
-echo "ServerStatus 客户端安装完成！"
+systemctl start status-client
