@@ -25,47 +25,41 @@ fi
 
 echo "Detected operating system: $OS"
 
+PIP_COMMAND="pip"
+PYTHON_COMMAND="python"
+
 case $OS in
     ubuntu|debian)
         apt update
-        apt install -y python python-pip wget vnstat
+        apt install -y python wget vnstat
+        if apt install -y python-pip ; then
+            PIP_COMMAND="pip"
+        elif apt install -y python3-pip ; then
+            PIP_COMMAND="pip3"
+            PYTHON_COMMAND="python3"
+        else
+            echo "Unable to install pip"
+            exit 1
+        fi
         ;;
     centos|redhat|fedora)
         yum update -y
-        yum install -y python python-pip wget vnstat
+        yum install -y python wget vnstat
+        if yum install -y python-pip ; then
+            PIP_COMMAND="pip"
+        elif yum install -y python3-pip ; then
+            PIP_COMMAND="pip3"
+            PYTHON_COMMAND="python3"
+        else
+            echo "Unable to install pip"
+            exit 1
+        fi
         ;;
     *)
         echo "Unsupported operating system $OS"
         exit 1
         ;;
 esac
-
-# 安装并配置vnStat
-if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
-    # vnStat 安装
-    case $OS in
-        ubuntu|debian)
-            apt install -y vnstat
-            ;;
-        centos|redhat|fedora)
-            yum install -y vnstat
-            ;;
-    esac
-    
-    # 初始化 vnStat
-    vnstat -u -i eth0
-
-    # 启动 vnStat 服务
-    case $OS in
-        ubuntu|debian|centos|redhat)
-            systemctl enable vnstat
-            systemctl start vnstat
-            ;;
-    esac
-    
-    # 设置cron job每30天重置vnStat数据
-    (crontab -l 2>/dev/null; echo "0 0 */30 * * vnstat --delete --force") | crontab -
-fi
 
 # 下载客户端文件
 wget -O /usr/local/status-client.py https://raw.githubusercontent.com/cokemine/ServerStatus-Hotaru/master/clients/status-client.py
@@ -75,6 +69,14 @@ sed -i "s/^SERVER =.*/SERVER = \"$CLIENT_SERVER\"/" /usr/local/status-client.py
 sed -i "s/^PORT =.*/PORT = $CLIENT_SERVER_PORT/" /usr/local/status-client.py
 sed -i "s/^USER =.*/USER = \"$CLIENT_USER\"/" /usr/local/status-client.py
 sed -i "s/^PASSWORD =.*/PASSWORD = \"$CLIENT_PASSWORD\"/" /usr/local/status-client.py
+
+# 安装并配置vnStat
+if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
+    vnstat -u -i eth0
+    systemctl enable vnstat
+    systemctl start vnstat
+    (crontab -l 2>/dev/null; echo "0 0 */30 * * vnstat --delete --force") | crontab -
+fi
 
 # 创建Systemd服务单元文件
 cat <<EOL > /etc/systemd/system/status-client.service
@@ -87,7 +89,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=root
-ExecStart=/usr/bin/python /usr/local/status-client.py run
+ExecStart=$PYTHON_COMMAND /usr/local/status-client.py run
 
 [Install]
 WantedBy=multi-user.target
