@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ServerStatus配置文件路径
-CONFIG_FILE="/root/ServerStatus/server/config.json"
+CONFIG_FILE="/usr/local/ServerStatus/server/config.json"
 
 # 备份当前的配置文件
 cp "$CONFIG_FILE" "$CONFIG_FILE.bak"
