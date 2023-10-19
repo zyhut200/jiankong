@@ -12,22 +12,25 @@ CLIENT_SERVER_PORT="51000"         # 服务端监听的端口
 CLIENT_VNSTAT="yes"                # 是否启用vnStat
 
 # 检查操作系统并安装必要软件
-if [ -f /etc/os-release ]; then
+if [[ -f /etc/os-release ]]; then
     . /etc/os-release
+    OS=$ID
 elif type lsb_release >/dev/null 2>&1; then
     OS=$(lsb_release -si)
-elif [ -f /etc/redhat-release ]; then
-    OS="Red Hat"
+elif [[ -f /etc/redhat-release ]]; then
+    OS="redhat"
 else
     OS=$(uname -s)
 fi
 
+echo "Detected operating system: $OS"
+
 case $OS in
-    Ubuntu*|Debian*)
-        apt-get update
-        apt-get install -y python python-pip wget vnstat
+    ubuntu|debian)
+        apt update
+        apt install -y python python-pip wget vnstat
         ;;
-    CentOS*|Fedora*|Red*)
+    centos|redhat|fedora)
         yum update -y
         yum install -y python python-pip wget vnstat
         ;;
@@ -37,32 +40,48 @@ case $OS in
         ;;
 esac
 
-# 下载客户端脚本并配置
+# 下载客户端文件
 wget -O /usr/local/status-client.py https://raw.githubusercontent.com/cokemine/ServerStatus-Hotaru/master/clients/status-client.py
-sed -i "s/SERVER = .*/SERVER = \"$CLIENT_SERVER\"/g" /usr/local/status-client.py
-sed -i "s/PORT = .*/PORT = $CLIENT_SERVER_PORT/g" /usr/local/status-client.py
-sed -i "s/USER = .*/USER = \"$CLIENT_USER\"/g" /usr/local/status-client.py
-sed -i "s/PASSWORD = .*/PASSWORD = \"$CLIENT_PASSWORD\"/g" /usr/local/status-client.py
 
-# 如果启用vnStat，检查版本并相应配置
-if [ "$CLIENT_VNSTAT" = "yes" ]; then
-    VNSTAT_VERSION=$(vnstat --version | head -1 | awk '{print $2}')
-    if [[ $(echo -e "2.0\n$VNSTAT_VERSION" | sort -V | head -n1) = "2.0" ]]; then
-        if ! grep -q "Database created" <<< $(vnstat --create -i eth0); then
-            echo "Error creating vnStat database"
-            exit 1
-        fi
-        systemctl restart vnstat
+# 配置客户端信息
+sed -i "s/^SERVER =.*/SERVER = \"$CLIENT_SERVER\"/" /usr/local/status-client.py
+sed -i "s/^PORT =.*/PORT = $CLIENT_SERVER_PORT/" /usr/local/status-client.py
+sed -i "s/^USER =.*/USER = \"$CLIENT_USER\"/" /usr/local/status-client.py
+sed -i "s/^PASSWORD =.*/PASSWORD = \"$CLIENT_PASSWORD\"/" /usr/local/status-client.py
+
+# 如果启用了vnStat，配置vnStat
+if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
+    # 验证vnStat是否已正确安装和配置
+    if ! command -v vnstat &> /dev/null; then
+        echo "vnStat could not be found!"
+        exit
     fi
-
+    
+    # 检查并启动vnStat服务
     systemctl enable vnstat
     systemctl start vnstat
 fi
 
-# 设置客户端脚本为开机启动
-echo "@reboot root /usr/bin/python /usr/local/status-client.py run" >> /etc/crontab
+# 创建Systemd服务单元文件
+cat <<EOL > /etc/systemd/system/status-client.service
+[Unit]
+Description=Server Status Client
+After=network.target
 
-# 运行客户端脚本
-nohup python /usr/local/status-client.py run &
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+ExecStart=/usr/bin/python /usr/local/status-client.py run
 
-echo "Client setup complete!"
+[Install]
+WantedBy=multi-user.target
+EOL
+
+# 重新加载Systemd守护进程，启动服务并使其在开机时自启
+systemctl daemon-reload
+systemctl start status-client
+systemctl enable status-client
+
+echo "Client setup completed!"
