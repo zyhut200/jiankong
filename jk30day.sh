@@ -57,37 +57,37 @@ if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
     systemctl enable vnstat
     systemctl start vnstat
 
-    # 设置cron job每2小时备份vnStat数据到 /backup/vnstat/
+   # 设置 cron job 每10分钟备份 vnStat 数据到 /backup/vnstat/vnstat.txt
+if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
     mkdir -p /backup/vnstat
-    (crontab -l 2>/dev/null; echo "*/10 * * * * cp /var/lib/vnstat/* /backup/vnstat/") | crontab -
+    (crontab -l 2>/dev/null; echo "*/10 * * * * vnstat > /backup/vnstat/vnstat.txt") | crontab -
 
     # 设置cron job每30天重置vnStat数据
-    (crontab -l 2>/dev/null; echo "0 0 */30 * * vnstat --delete --force") | crontab -
+        (crontab -l 2>/dev/null; echo "0 0 */30 * * vnstat --delete --force") | crontab -
 fi
 
-# 修改客户端文件，改为启动时读取配置文件的 vnStat 数据
+# 修改客户端文件，改为在启动时读取和解析备份的 vnStat 数据
 if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
     echo "
-import json
 import os
+import re
 
-def get_vnstat_data_from_config():
-    config_file = '/backup/vnstat/vnstat.json'
-    if os.path.exists(config_file):
+def get_backup_vnstat_data():
+    backup_file = '/backup/vnstat/vnstat.txt'
+    if os.path.exists(backup_file):
         try:
-            with open(config_file, 'r') as file:
-                data = json.load(file)
-            rx = data['rx']
-            tx = data['tx']
+            with open(backup_file, 'r') as file:
+                data = file.readlines()
+            rx = re.search('rx:\\s+(\\d+\\.\\d+)\\s+(TiB|GiB|MiB|KiB)', data[-2])
+            tx = re.search('tx:\\s+(\\d+\\.\\d+)\\s+(TiB|GiB|MiB|KiB)', data[-1])
+            return float(rx.group(1)), rx.group(2), float(tx.group(1)), tx.group(2)
         except Exception as e:
-            print('Error reading vnStat data from config file:', e)
-            rx, tx = 0, 0
+            print('Error reading backup vnStat data:', e)
+            return 0, 'KiB', 0, 'KiB'
     else:
-        rx, tx = 0, 0
-    
-    return rx, tx
+        return 0, 'KiB', 0, 'KiB'
 
-rx, tx = get_vnstat_data_from_config()
+rx_value, rx_unit, tx_value, tx_unit = get_backup_vnstat_data()
 " >> /usr/local/status-client.py
 fi
 
