@@ -25,35 +25,14 @@ fi
 
 echo "Detected operating system: $OS"
 
-PIP_COMMAND="pip"
-PYTHON_COMMAND="python"
-
 case $OS in
     ubuntu|debian)
         apt update
-        apt install -y python wget vnstat
-        if apt install -y python-pip ; then
-            PIP_COMMAND="pip"
-        elif apt install -y python3-pip ; then
-            PIP_COMMAND="pip3"
-            PYTHON_COMMAND="python3"
-        else
-            echo "Unable to install pip"
-            exit 1
-        fi
+        apt install -y wget make gcc
         ;;
     centos|redhat|fedora)
         yum update -y
-        yum install -y python wget vnstat
-        if yum install -y python-pip ; then
-            PIP_COMMAND="pip"
-        elif yum install -y python3-pip ; then
-            PIP_COMMAND="pip3"
-            PYTHON_COMMAND="python3"
-        else
-            echo "Unable to install pip"
-            exit 1
-        fi
+        yum install -y wget make gcc
         ;;
     *)
         echo "Unsupported operating system $OS"
@@ -72,13 +51,23 @@ sed -i "s/^PASSWORD =.*/PASSWORD = \"$CLIENT_PASSWORD\"/" /usr/local/status-clie
 
 # 安装并配置vnStat
 if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
-    vnstat -u -i eth0
+    # 下载，编译和安装vnStat
+    wget -O vnstat.tar.gz https://humdi.net/vnstat/vnstat-latest.tar.gz
+    tar -zxvf vnstat.tar.gz
+    cd vnstat-*
+    make && sudo make install
+
+    # 初始化 vnStat 和启动服务
+    vnstat --create -i eth0
     systemctl enable vnstat
     systemctl start vnstat
+    
+    # 设置cron job每30天重置vnStat数据
     (crontab -l 2>/dev/null; echo "0 0 */30 * * vnstat --delete --force") | crontab -
 fi
 
 # 创建Systemd服务单元文件
+PYTHON_COMMAND=$(command -v python3 || command -v python)
 cat <<EOL > /etc/systemd/system/status-client.service
 [Unit]
 Description=Server Status Client
