@@ -34,11 +34,11 @@ sed -i "s/^PORT =.*/PORT = $CLIENT_SERVER_PORT/" /usr/local/status-client.py
 sed -i "s/^USER =.*/USER = \"$CLIENT_USER\"/" /usr/local/status-client.py
 sed -i "s/^PASSWORD =.*/PASSWORD = \"$CLIENT_PASSWORD\"/" /usr/local/status-client.py
 
-# 如果启用vnStat，初始化vnStat
-if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
-    vnstat -u -i eth0  # 你可能需要将eth0更改为你的活动网络接口
-    echo "*/5 * * * * root /usr/bin/vnstat -u" >> /etc/crontab
-    echo "0 0 1 * * root /usr/bin/vnstat -i eth0 --resetmonths" >> /etc/crontab
+# 如果启用了vnStat，配置vnStat
+if [ "$CLIENT_VNSTAT" = "yes" ]; then
+    vnstat --create -i eth0
+    systemctl enable vnstat
+    systemctl start vnstat
 fi
 
 # 创建Systemd服务单元文件
