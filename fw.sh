@@ -23,17 +23,9 @@ add_server_status_node() {
         esac
     done
     
-    # 构建JSON格式的节点信息并添加到配置文件
-    node_json="{
-        \"username\": \"$username\",
-        \"password\": \"$password\",
-        \"name\": \"$name\",
-        \"type\": \"$type\",
-        \"host\": \"None\",
-        \"location\": \"$location\",
-        \"disabled\": false,
-        \"region\": \"$region\"
-    }"
+    # 使用printf构建JSON格式的节点信息
+    node_json=$(printf '{"username": "%s", "password": "%s", "name": "%s", "type": "%s", "host": "None", "location": "%s", "disabled": false, "region": "%s"}' \
+        "$username" "$password" "$name" "$type" "$location" "$region")
 
     # 使用 jq 工具将新的节点信息添加到配置文件的 json 数组中
     # 安装 jq 工具如果你的系统还没有安装
