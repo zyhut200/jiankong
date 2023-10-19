@@ -24,17 +24,14 @@ add_server_status_node() {
     done
     
     # 构建JSON格式的节点信息并添加到配置文件
-    node_json=$(cat <<- EOM
-        {
-            "username": "$username",
-            "password": "$password",
-            "name": "$name",
-            "type": "$virtualization",
-            "location": "$location",
-            "region": "$region"
-        }
-    EOM
-    )
+    node_json="{
+        \"username\": \"$username\",
+        \"password\": \"$password\",
+        \"name\": \"$name\",
+        \"type\": \"$virtualization\",
+        \"location\": \"$location\",
+        \"region\": \"$region\"
+    }"
 
     # 使用jq工具将新的节点信息添加到配置文件的json数组中
     # 安装jq工具如果你的系统还没有安装
