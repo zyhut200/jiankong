@@ -65,28 +65,29 @@ if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
     (crontab -l 2>/dev/null; echo "0 0 */30 * * vnstat --delete --force") | crontab -
 fi
 
-# 修改客户端文件，改为读取备份的vnStat数据
+# 修改客户端文件，改为启动时读取配置文件的 vnStat 数据
 if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
     echo "
 import json
 import os
 
-def get_backup_vnstat_data():
-    try:
-        with open('/backup/vnstat/vnstat.json', 'r') as file:
-            data = json.load(file)
-        return data
-    except Exception as e:
-        print('Error reading backup vnStat data:', e)
-        return None
+def get_vnstat_data_from_config():
+    config_file = '/backup/vnstat/vnstat.json'
+    if os.path.exists(config_file):
+        try:
+            with open(config_file, 'r') as file:
+                data = json.load(file)
+            rx = data['rx']
+            tx = data['tx']
+        except Exception as e:
+            print('Error reading vnStat data from config file:', e)
+            rx, tx = 0, 0
+    else:
+        rx, tx = 0, 0
+    
+    return rx, tx
 
-vnstat_data = get_backup_vnstat_data()
-if vnstat_data:
-    rx = vnstat_data['interfaces'][0]['traffic']['total']['rx']
-    tx = vnstat_data['interfaces'][0]['traffic']['total']['tx']
-else:
-    rx = 0
-    tx = 0
+rx, tx = get_vnstat_data_from_config()
 " >> /usr/local/status-client.py
 fi
 
