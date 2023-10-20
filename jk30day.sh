@@ -63,33 +63,35 @@ if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
     (crontab -l 2>/dev/null; echo "*/10 * * * * vnstat > /backup/vnstat/vnstat.txt") | crontab -
 
     # 设置cron job每30天重置vnStat数据
-        (crontab -l 2>/dev/null; echo "0 0 */30 * * vnstat --delete --force") | crontab -
+    (crontab -l 2>/dev/null; echo "*/10 * * * * cp /var/lib/vnstat/* /backup/vnstat/") | crontab -
 fi
 
-# 修改客户端文件，改为在启动时读取和解析备份的 vnStat 数据
+# 修改客户端文件，改为启动时读取配置文件的 vnStat 数据
 if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
     echo "
+import json
 import os
-import re
 
-def get_backup_vnstat_data():
-    backup_file = '/backup/vnstat/vnstat.txt'
-    if os.path.exists(backup_file):
+def get_vnstat_data_from_config():
+    config_file = '/path/to/your/config/file.json'
+    if os.path.exists(config_file):
         try:
-            with open(backup_file, 'r') as file:
-                data = file.readlines()
-            rx = re.search('rx:\\s+(\\d+\\.\\d+)\\s+(TiB|GiB|MiB|KiB)', data[-2])
-            tx = re.search('tx:\\s+(\\d+\\.\\d+)\\s+(TiB|GiB|MiB|KiB)', data[-1])
-            return float(rx.group(1)), rx.group(2), float(tx.group(1)), tx.group(2)
+            with open(config_file, 'r') as file:
+                data = json.load(file)
+            rx = data['rx']
+            tx = data['tx']
         except Exception as e:
-            print('Error reading backup vnStat data:', e)
-            return 0, 'KiB', 0, 'KiB'
+            print('Error reading vnStat data from config file:', e)
+            rx, tx = 0, 0
     else:
-        return 0, 'KiB', 0, 'KiB'
+        rx, tx = 0, 0
+    
+    return rx, tx
 
-rx_value, rx_unit, tx_value, tx_unit = get_backup_vnstat_data()
+rx, tx = get_vnstat_data_from_config()
 " >> /usr/local/status-client.py
 fi
+
 
 # 创建Systemd服务单元文件
 PYTHON_COMMAND=$(command -v python3 || command -v python)
