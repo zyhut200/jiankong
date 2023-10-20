@@ -50,14 +50,13 @@ sed -i "s/^PORT =.*/PORT = $CLIENT_SERVER_PORT/" /usr/local/status-client.py
 sed -i "s/^USER =.*/USER = \"$CLIENT_USER\"/" /usr/local/status-client.py
 sed -i "s/^PASSWORD =.*/PASSWORD = \"$CLIENT_PASSWORD\"/" /usr/local/status-client.py
 
-
 # 初始化 vnStat 并启动服务
 if [[ "$CLIENT_VNSTAT" == "yes" ]]; then
     vnstat -i eth0
     systemctl enable vnstat
     systemctl start vnstat
 
-  # 设置cron job每2小时备份vnStat数据到 /backup/vnstat/
+    # 设置cron job每2小时备份vnStat数据到 /backup/vnstat/
     mkdir -p /backup/vnstat
     (crontab -l 2>/dev/null; echo "0 */2 * * * cp /var/lib/vnstat/* /backup/vnstat/") | crontab -
 
@@ -90,7 +89,6 @@ def get_vnstat_data_from_config():
 rx, tx = get_vnstat_data_from_config()
 " >> /usr/local/status-client.py
 fi
-
 
 # 创建Systemd服务单元文件
 PYTHON_COMMAND=$(command -v python3 || command -v python)
