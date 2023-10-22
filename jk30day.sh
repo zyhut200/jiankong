@@ -7,7 +7,7 @@ echo "Client IP: $CLIENT_IP"
 # 客户端配置信息
 CLIENT_USER="$CLIENT_IP"           # 用户名
 CLIENT_PASSWORD="123456"           # 密码
-CLIENT_SERVER="45.148.134.106"     # 服务端IP地址
+CLIENT_SERVER="103.170.155.35"     # 服务端IP地址
 CLIENT_SERVER_PORT="51000"         # 服务端监听的端口
 CLIENT_VNSTAT="yes"                # 是否启用vnStat
 
